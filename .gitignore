@@ -1,4 +1,8 @@
 ## Ignore nodejs things
+/.easywall/
+/meshcentral-data/
+/meshcentral-files/
+/meshcentral-backups/
 [Nn]ode_modules/
 [Tt]yping/
 [Ii]mages-spare/
