@@ -1,3 +1,12 @@
+# Easy Remote Desktop — Easywall
+
+Fork de laboratório do MeshCentral para acesso remoto aos clientes Windows 11.
+
+- [Iniciar, instalar clientes e operar](easywall/README.md)
+- [Candidatos avaliados e plano de evolução comercial](easywall/PLANO.md)
+
+Customizações Easywall: bootstrap, identidade do painel, operação local e atualização de dependências. Licença e documentação originais preservadas abaixo.
+
 # MeshCentral
 
 ## Table of Contents
