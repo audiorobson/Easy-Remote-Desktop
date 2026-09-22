@@ -792,6 +792,7 @@ else {
 
 // MeshAgent JavaScript Core Module. This code is sent to and running on the mesh agent.
 var meshCoreObj = { action: 'coreinfo', value: (require('MeshAgent').coreHash ? ((process.versions.compileTime ? process.versions.compileTime : '').split(', ')[1].replace('  ', ' ') + ', ' + crc32c(require('MeshAgent').coreHash)) : ('MeshCore v6')), caps: 14, root: require('user-sessions').isRoot() }; // Capability bitmask: 1 = Desktop, 2 = Terminal, 4 = Files, 8 = Console, 16 = JavaScript, 32 = Temporary Agent, 64 = Recovery Agent
+if (process.platform == 'win32') { meshCoreObj.value += ';ew-files-2'; } // Signals validated native ZIP extraction to the Control Room.
 
 // Get the operating system description string
 try { require('os').name().then(function (v) { meshCoreObj.osdesc = v; meshCoreObjChanged(); }); } catch (ex) { }
@@ -2509,6 +2510,49 @@ function onTcpRelayServerTunnelData(data) {
     }
 }
 
+// Reparse points are not traversed by recursive file mutations.
+var fileAttributesProxy = null;
+function isFileReparsePoint(path)
+{
+    if (process.platform != 'win32') { return false; }
+    if (fileAttributesProxy == null) { fileAttributesProxy = require('_GenericMarshal').CreateNativeProxy('kernel32.dll'); fileAttributesProxy.CreateMethod('GetFileAttributesW'); }
+    var attributes = fileAttributesProxy.GetFileAttributesW(require('_GenericMarshal').CreateVariable(path.split('/').join('\\'), { wide: true })).Val;
+    if (attributes == -1 || attributes == 4294967295) { throw new Error('File attributes unavailable'); }
+    return (attributes & 1024) != 0;
+}
+function validateFileMutationTree(path, state, depth)
+{
+    state = state || { count: 0 }; depth = depth || 0;
+    if (++state.count > 20000 || depth > 64 || isFileReparsePoint(path)) { throw new Error('Unsupported recursive path'); }
+    if (fs.statSync(path).isDirectory()) {
+        var children = fs.readdirSync(path);
+        for (var i = 0; i < children.length; i++) { validateFileMutationTree(obj.path.join(path, children[i]), state, depth + 1); }
+    }
+}
+
+// Validate native ZIP entries before extractAll can write to the destination.
+function validateZipExtraction(zipped)
+{
+    var names = zipped.files, seen = {}, total = 0;
+    if (!Array.isArray(names) || names.length === 0 || names.length > 10000) { throw new Error('ZIP entry limit'); }
+    for (var i = 0; i < names.length; i++) {
+        var name = names[i];
+        if (typeof name != 'string' || name.length > 4096) { throw new Error('Invalid ZIP name'); }
+        var normalizedName = name.replace(/\\/g, '/'), directoryEntry = normalizedName.endsWith('/');
+        var parts = normalizedName.split('/'); if (directoryEntry) { parts.pop(); }
+        if (parts.length > 64) { throw new Error('ZIP depth limit'); }
+        for (var j = 0; j < parts.length; j++) {
+            if (!parts[j] || parts[j] == '.' || parts[j] == '..' || /[\\/:*?"<>|\x00-\x1f]/.test(parts[j]) || /[. ]$/.test(parts[j]) || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(parts[j])) { throw new Error('Unsafe ZIP name'); }
+        }
+        var key = '$' + parts.join('/').toLowerCase();
+        if (seen[key]) { throw new Error('Duplicate ZIP name'); } seen[key] = directoryEntry ? 2 : 1;
+        var info = zipped._table && zipped._table[name];
+        if (!info || typeof info.uncompressedSize != 'number' || info.uncompressedSize < 0 || info.uncompressedSize > 107374182400) { throw new Error('Unsupported ZIP metadata'); }
+        total += info.uncompressedSize; if (total > 1099511627776) { throw new Error('ZIP size limit'); }
+    }
+    for (var key in seen) { var parts = key.split('/'); while (parts.length > 1) { parts.pop(); if (seen[parts.join('/')] === 1) { throw new Error('ZIP file/folder conflict'); } } }
+}
+
 // Easywall fix: release the native file descriptor on every download exit.
 // The download belongs to the protocol socket, not httprequest.downloadFile.
 function closeFileDownload(socket)
@@ -4044,6 +4088,7 @@ function onTunnelData(data)
                     // Send the folder content to the browser
                     var response = getDirectoryInfo(cmd.path);
                     response.reqid = cmd.reqid;
+                    if (cmd.path && Array.isArray(response.dir)) { for (var ri = 0; ri < response.dir.length; ri++) { try { if (isFileReparsePoint(obj.path.join(cmd.path, response.dir[ri].n))) { response.dir[ri].t = 4; } } catch (attrError) { response.dir[ri].t = 4; } } }
                     this.write(Buffer.from(JSON.stringify(response)));
 
                     /*
@@ -4074,7 +4119,7 @@ function onTunnelData(data)
                     // Delete, possibly recursive delete
                     for (var i in cmd.delfiles) {
                         var p = obj.path.join(cmd.path, cmd.delfiles[i]), delcount = 0;
-                        try { delcount = deleteFolderRecursive(p, cmd.rec); } catch (ex) { }
+                        try { if (cmd.rec) { validateFileMutationTree(p); } delcount = deleteFolderRecursive(p, cmd.rec); } catch (ex) { }
                         if ((delcount == 1) && !cmd.rec) {
                             MeshServerLogEx(45, [p], "Delete: \"" + p + "\"", this.httprequest);
                         } else {
@@ -4245,7 +4290,7 @@ function onTunnelData(data)
 
                     // Check that the specified files exist & build full paths
                     var fp, stat, p = [];
-                    for (var i in cmd.files) { fp = cmd.path + '/' + cmd.files[i]; stat = null; try { stat = fs.statSync(fp); } catch (ex) { } if (stat != null) { p.push(fp); } }
+                    for (var i in cmd.files) { fp = cmd.path + '/' + cmd.files[i]; stat = null; try { stat = fs.statSync(fp); } catch (ex) { } if (stat != null) { try { validateFileMutationTree(fp); p.push(fp); } catch (treeError) { this.write(Buffer.from(JSON.stringify({ action: 'dialogmessage', msg: 'unziperror' }))); return; } } }
                     if (p.length == 0) return; // No files, quit now.
 
                     // Setup file compression
@@ -4263,17 +4308,26 @@ function onTunnelData(data)
                         delete this.xws.zipfile;
                         delete this.xws.zip;
                     });
-                    this.zip = require('zip-writer').write({ files: p, basePath: cmd.path });
+                    this.zip = require('easywall-zip-writer').write({ files: p, basePath: cmd.path });
                     this.zip.xws = this;
                     this.zip.on('progress', require('events').moderated(function (name, p) { this.xws.write(Buffer.from(JSON.stringify({ action: 'dialogmessage', msg: 'zippingFile', file: ((process.platform == 'win32') ? (name.split('/').join('\\')) : name), progress: p }))); }, 1000));
                     this.zip.pipe(out);
                     break;
                 case 'unzip':
                     if (this.unzip != null) return; // Unzip operating is currently running, exit now.
-                    this.unzip = require('zip-reader').read(cmd.input);
-                    this.unzip._dest = cmd.dest;
+                    this.unzip = require('easywall-zip-reader').read(cmd.input);
+                    this.unzip._dest = (process.platform == 'win32') ? cmd.dest.split('/').join('\\') : cmd.dest;
                     this.unzip.xws = this;
                     this.unzip.then(function (zipped) {
+                        try {
+                            validateZipExtraction(zipped);
+                            if (fs.existsSync(this._dest)) { throw new Error('Destination exists'); }
+                            fs.mkdirSync(this._dest);
+                        } catch (ex) {
+                            try { zipped.close(); } catch (closeError) { }
+                            this.xws.write(Buffer.from(JSON.stringify({ action: 'dialogmessage', msg: 'unziperror' })));
+                            delete this.xws.unzip; return;
+                        }
                         this.xws.write(Buffer.from(JSON.stringify({ action: 'dialogmessage', msg: 'unzipping' })));
                         zipped.xws = this.xws;
                         zipped.extractAll(this._dest).then(function () { // finished extracting
