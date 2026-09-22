@@ -2509,8 +2509,22 @@ function onTcpRelayServerTunnelData(data) {
     }
 }
 
+// Easywall fix: release the native file descriptor on every download exit.
+// The download belongs to the protocol socket, not httprequest.downloadFile.
+function closeFileDownload(socket)
+{
+    var download = socket.filedownload;
+    delete socket.filedownload;
+    if (download && download.f != null) {
+        try { fs.closeSync(download.f); } catch (ex) { }
+        delete download.f;
+    }
+}
+
 function onTunnelClosed()
 {
+    closeFileDownload(this);
+    if (this.webrtc && this.webrtc.rtcchannel) { closeFileDownload(this.webrtc.rtcchannel); }
     if (this.httprequest._dispatcher != null && this.httprequest.term == null)
     {
         // Windows Dispatcher was created to spawn a child connection, but the child didn't connect yet, so we have to shutdown the dispatcher, otherwise the child may end up hanging
@@ -3361,6 +3375,7 @@ function files_consentpromise_rejected(e)
 }
 function files_tunnel_endhandler()
 {
+    closeFileDownload(this);
     if (this._consentpromise && this._consentpromise.close) { this._consentpromise.close(); }
 }
 
@@ -4130,21 +4145,27 @@ function onTunnelData(data)
                                 }
                             }
                             MeshServerLogEx((cmd.ask == 'coredump') ? 104 : 49, [cmd.path], 'Download: \"' + cmd.path + '\"', this.httprequest);
-                            if ((cmd.path == null) || (this.filedownload != null)) { this.write({ action: 'download', sub: 'cancel', id: this.filedownload.id }); delete this.filedownload; }
+                            if (this.filedownload != null) { var previousId = this.filedownload.id; closeFileDownload(this); this.write({ action: 'download', sub: 'cancel', id: previousId }); }
+                            if (typeof cmd.path != 'string') { this.write({ action: 'download', sub: 'cancel', id: cmd.id }); break; }
                             this.filedownload = { id: cmd.id, path: cmd.path, ptr: 0 }
-                            try { this.filedownload.f = fs.openSync(this.filedownload.path, 'rbN'); } catch (ex) { this.write({ action: 'download', sub: 'cancel', id: this.filedownload.id }); delete this.filedownload; }
-                            if (this.filedownload) { this.write({ action: 'download', sub: 'start', id: cmd.id }); }
+                            try { this.filedownload.f = fs.openSync(this.filedownload.path, 'rbN'); } catch (ex) { closeFileDownload(this); this.write({ action: 'download', sub: 'cancel', id: cmd.id }); }
+                            if (this.filedownload) { try { this.write({ action: 'download', sub: 'start', id: cmd.id }); } catch (ex) { closeFileDownload(this); } }
                         } else if ((this.filedownload != null) && (cmd.id == this.filedownload.id)) { // Download commands
-                            if (cmd.sub == 'startack') { sendNextBlock = ((typeof cmd.ack == 'number') ? cmd.ack : 8); } else if (cmd.sub == 'stop') { delete this.filedownload; } else if (cmd.sub == 'ack') { sendNextBlock = 1; }
+                            if (cmd.sub == 'startack') { sendNextBlock = ((typeof cmd.ack == 'number') ? cmd.ack : 8); } else if (cmd.sub == 'stop') { closeFileDownload(this); } else if (cmd.sub == 'ack') { sendNextBlock = 1; }
                         }
                         // Send the next download block(s)
                         if (sendNextBlock > 0) {
                             sendNextBlock--;
-                            var buf = Buffer.alloc(16384);
-                            var len = fs.readSync(this.filedownload.f, buf, 4, 16380, null);
-                            this.filedownload.ptr += len;
-                            if (len < 16380) { buf.writeInt32BE(0x01000001, 0); fs.closeSync(this.filedownload.f); delete this.filedownload; sendNextBlock = 0; } else { buf.writeInt32BE(0x01000000, 0); }
-                            this.write(buf.slice(0, len + 4)); // Write as binary
+                            try {
+                                var buf = Buffer.alloc(16384);
+                                var len = fs.readSync(this.filedownload.f, buf, 4, 16380, null);
+                                this.filedownload.ptr += len;
+                                if (len < 16380) { buf.writeInt32BE(0x01000001, 0); closeFileDownload(this); sendNextBlock = 0; } else { buf.writeInt32BE(0x01000000, 0); }
+                                this.write(buf.slice(0, len + 4)); // Write as binary
+                            } catch (ex) {
+                                closeFileDownload(this);
+                                try { this.write({ action: 'download', sub: 'cancel', id: cmd.id }); } catch (sendError) { }
+                            }
                         }
                         break;
                     }
