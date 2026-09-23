@@ -7496,6 +7496,11 @@ module.exports.CreateWebServer = function (parent, db, args, certificates, doneF
                 if ((parent.config.domains[i].dns != null) || (parent.config.domains[i].share != null)) { continue; } // This is a subdomain with a DNS name, no added HTTP bindings needed.
                 var domain = parent.config.domains[i];
                 var url = domain.url;
+                // Easywall: retire the legacy browser entry points, retaining agent/API transports.
+                if (parent.config.settings.easywallcontrolroomurl) {
+                    obj.app.all([url, url + 'login', url + 'tokenlogin', url + 'logout'],
+                        require('./easywall/official-panel.cjs')(parent.config.settings.easywallcontrolroomurl));
+                }
                 if (typeof domain.rootredirect == 'string') {
                     // Root page redirects the user to a different URL
                     obj.app.get(url, handleRootRedirect);

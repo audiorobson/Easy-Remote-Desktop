@@ -19,10 +19,10 @@ function get(url) {
   });
 }
 async function main() {
-  const page = await get(base);
+  const page = await get(base + '/health.ashx');
   let html = ''; for await (const chunk of page) html += chunk;
-  if (!html.includes('Easy Remote Desktop')) throw new Error('Branding missing');
-  console.log('PASS: HTTPS with local CA validation and Easywall login page.');
+  if (html !== 'ok') throw new Error('Backend health check failed');
+  console.log('PASS: Backend HTTPS health with local CA validation. Official UI: Control Room.');
   const ws = new WebSocket(base.replace('https:', 'wss:') + '/control.ashx', { ca,
     headers: { 'x-meshauth': Buffer.from('easywall-admin').toString('base64') + ',' + Buffer.from(password).toString('base64') } });
   const pending = new Map(); let sequence = 0;

@@ -1,5 +1,7 @@
 # Correção de liberação de download — 22/09/2026
 
+Referência consolidada: commits `0e7b436b` e `7deeff42`; [handoff do fork](HANDOFF-BACKEND.md). Este registro é cronológico: os seis testes e resíduos citados inicialmente foram sucedidos pela bateria de nove testes e pela limpeza documentada ao final. Preserve as evidências e limitações de cada etapa.
+
 Escopo autorizado pelo usuário: corrigir o bloqueio de arquivo após interromper download. Mudança no core nativo `agents/meshcore.js`, preservando protocolo, permissões e transporte.
 
 `closeFileDownload` fecha o descritor inclusive quando seu valor é zero, remove a referência e tolera chamadas repetidas. Chamado em stop, substituição do download, EOF, erros de leitura/escrita, encerramento do túnel (antes de retornos antecipados), canal WebRTC e end do canal de arquivos. Start sem caminho válido devolve cancel sem acessar estado inexistente. Não foi alterado o binário do agente.

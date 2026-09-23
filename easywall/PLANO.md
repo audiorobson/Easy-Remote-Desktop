@@ -2,6 +2,8 @@
 
 Decisão técnica e plano do laboratório, 19/09/2026.
 
+Registro histórico da seleção inicial. Para arquitetura e continuidade atuais, consultar [HANDOFF-BACKEND.md](HANDOFF-BACKEND.md) e o repositório separado do Control Room.
+
 ## Seleção
 
 | Candidato | Licença consultada | Adequação | Decisão |

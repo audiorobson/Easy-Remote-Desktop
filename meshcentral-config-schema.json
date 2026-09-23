@@ -11,6 +11,10 @@
     "settings": {
       "type": "object",
       "properties": {
+        "easywallControlRoomUrl": {
+          "type": "string",
+          "description": "Easywall fork: redirect legacy browser root/login/tokenlogin/logout to the official Control Room. Agent and WebSocket endpoints remain active."
+        },
         "cert": {
           "type": "string",
           "description": "Set this to the primary DNS name of this MeshCentral server."

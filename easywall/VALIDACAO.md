@@ -1,4 +1,14 @@
-# Registro de validação — 19/09/2026
+# Registro de validação
+
+## Consolidação do fork — 23/09/2026
+
+- `node --test easywall/download-lifecycle.test.cjs easywall/official-panel.test.cjs`: **11 testes passaram**, nove de core/arquivos e dois de redirecionamento.
+- Sintaxe Node verificada em `meshcentral.js`, `webserver.js`, `agents/meshcore.js`, `official-panel.cjs`, `setup.cjs` e `prepare-clients.cjs`.
+- Schema JSON válido; parser PowerShell sem erros em `Start-Easywall.ps1`, `Start-Lab.ps1` e `Stop-Lab.ps1`; `git diff --check` passou.
+- Consolidação documental em [HANDOFF-BACKEND.md](HANDOFF-BACKEND.md), com limites de empacotamento, versões, migração e instruções de integração.
+- Nesta conferência não foram executados bootstrap, preparação de agentes, alteração de firewall, reinício de backend ou comandos remotos. Evidências físicas anteriores têm suas próprias datas; estes testes não homologam instalação/overlay em estação nem operação 24/7.
+
+## Registro histórico — 19/09/2026
 
 Executado no servidor Windows do laboratório com Node.js 24.19.0.
 

@@ -1,11 +1,15 @@
 # Easy Remote Desktop — Easywall
 
+**Painel oficial: [Easywall Control Room](http://127.0.0.1:4070/).** Inicie backend e painel com `./Start-Easywall.ps1`. Desenvolva o produto em `.easywall/product` (repositório independente). A interface web antiga está desativada por redirecionamento; MeshCentral permanece como backend. Consulte [operação e localização do produto](easywall/PAINEL-OFICIAL.md).
+
 Fork de laboratório do MeshCentral para acesso remoto aos clientes Windows 11.
 
 - [Iniciar, instalar clientes e operar](easywall/README.md)
+- [Handoff do fork, reprodução e integração no Easywall](easywall/HANDOFF-BACKEND.md)
+- [Correções de downloads, operações recursivas e ZIP](easywall/DOWNLOAD-LIFECYCLE.md)
 - [Candidatos avaliados e plano de evolução comercial](easywall/PLANO.md)
 
-Customizações Easywall: bootstrap, identidade do painel, operação local e atualização de dependências. Licença e documentação originais preservadas abaixo.
+Customizações Easywall: bootstrap, redirecionamento para o produto separado, operação local, atualização de dependências e correções do core para downloads/recursão/ZIP. Dados operacionais não são distribuídos neste Git. Licença e documentação originais preservadas abaixo.
 
 # MeshCentral
 

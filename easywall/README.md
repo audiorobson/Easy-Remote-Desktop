@@ -1,10 +1,26 @@
-# Easy Remote Desktop / Easywall — laboratório
+# Easy Remote Desktop / Easywall — backend
+
+## Estado consolidado em 23/09/2026
+
+Comece pelo [handoff do backend e do fork](HANDOFF-BACKEND.md): origem, customizações, reprodução, migração, atualização e instruções para o próximo agente LLM.
+
+Este repositório público (`master`) contém o backend MeshCentral. O Control Room tem repositório privado separado (`main`), em `.easywall/product`, ignorado neste Git. Versões de referência: produto **0.11.0**, fontes do cliente Windows **0.3.0**, instalador piloto existente **0.2.0**, que não foi regenerado com o Overlay Host.
+
+O fluxo abaixo é histórico do bootstrap do laboratório: não reproduz sozinho o produto. Para uma instalação nova é necessário obter também o repositório do Control Room e provisionar seus dados conforme o handoff. Em ambiente existente, preserve dados e certificados; não execute setup novamente.
+
+`.easywall/client` contém o agente antigo vinculado ao laboratório. O cliente atual está em `.easywall/product/client-windows`; consulte seu README e `docs/INSTALADOR-PILOTO.md` antes de distribuir. Não instale um segundo agente sobre uma estação já vinculada para testar o pacote.
+
+`prepare-clients.cjs` cria/garante o grupo e baixa um agente vinculado; não é uma verificação somente de leitura. O script de firewall também altera o ambiente. Execute-os apenas no provisionamento deliberado.
+
+## Guia original do laboratório
+
+**Entrada oficial: http://127.0.0.1:4070/ — Easywall Control Room.** Inicie com `./Start-Easywall.ps1` na raiz. Código do produto: `.easywall/product`. Consulte [PAINEL-OFICIAL.md](PAINEL-OFICIAL.md). As instruções de laboratório abaixo tratam do backend; sua interface antiga foi desativada por redirecionamento.
 
 Base funcional: MeshCentral. Consulte [a comparação e o plano](PLANO.md).
 
 ## Usar este laboratório
 
-1. Abra o endereço indicado em `.easywall/ACESSO-LOCAL.txt` no servidor e use a conta ali registrada. A senha permanece somente no disco local. Ative MFA.
+1. Abra http://127.0.0.1:4070/ no servidor e use sua conta do Control Room. `.easywall/ACESSO-LOCAL.txt` contém credenciais técnicas do backend, não o acesso ao painel oficial.
 2. Execute `easywall/Enable-LabFirewall.ps1` em PowerShell **como Administrador** no servidor caso a regra ainda não exista. Ela permite somente a sub-rede local.
 3. Copie `.easywall/client/Easywall-Windows-x64.exe` para cada um dos dois clientes Windows 11 x64. Execute como Administrador e escolha **Install**. Para Windows ARM64 gere o agente correspondente pelo painel.
 4. No painel, abra o grupo **Easywall - Laboratorio**, selecione o cliente e use **Desktop**, **Files** ou **Terminal**. O grupo notifica o usuário sobre essas sessões.
@@ -34,7 +50,7 @@ Logs: `.easywall/server.log` e `.easywall/server-error.log`. Não há serviço d
 
 ## Verificação
 
-`node easywall/prepare-clients.cjs` valida a página HTTPS com a CA deste servidor, autentica por WebSocket, garante o grupo do laboratório, baixa e verifica o cabeçalho PE do agente x64 e informa a quantidade de dispositivos cadastrados. Não comprova uma sessão remota ponta a ponta.
+`node easywall/prepare-clients.cjs` valida o endpoint de saúde HTTPS do backend com a CA deste servidor, autentica por WebSocket, garante o grupo do laboratório, baixa e verifica o cabeçalho PE do agente x64 e informa a quantidade de dispositivos cadastrados. Não comprova uma sessão remota ponta a ponta.
 
 `npm audit` verifica as dependências. Faça backup protegido de `meshcentral-data/` com o servidor parado, incluindo os certificados; a perda dessas chaves afeta a reconexão dos agentes. Nunca versione esse diretório.
 
